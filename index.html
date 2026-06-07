@@ -2,6 +2,8 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8"><title>Smail Premium</title>
+    <script src="https://gstatic.com"></script>
+    <script src="https://gstatic.com"></script>
     <style>
         body{font-family:sans-serif;background:#121212;color:#e0e0e0;padding:20px;display:flex;flex-direction:column;align-items:center}
         .box{background:#1e1e1e;padding:20px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.3);width:100%;max-width:400px;margin-bottom:15px;border:1px solid #333}
@@ -18,6 +20,7 @@
         .mail-item{background:#2d2d2d;padding:8px;margin-top:5px;border-radius:4px;font-size:13px;border-left:3px solid #3b82f6;word-break:break-word;position:relative}
         .del-btn{position:absolute;top:5px;right:5px;background:none;border:none;color:#ef4444;cursor:pointer;font-size:12px;padding:0;width:auto;margin:0}
         .time-badge{font-size:10px;color:#aaa;display:block;margin-top:3px}
+        .admin-box{background:#2a1f1f;border:1px solid #ef4444;padding:12px;margin-top:20px;border-radius:6px;font-size:13px}
     </style>
 </head>
 <body>
@@ -60,11 +63,19 @@
             <a id="tabTrash" class="tab" onclick="switchTab('trash')">🗑️ Papierkorb</a>
         </div>
         <div id="inbox"></div>
+        <div id="adminPanel" class="admin-box hide">
+            <strong style="color:#ef4444">👑 Admin-Benachrichtigungen</strong>
+            <p style="font-size:11px;color:#aaa;margin-bottom:5px">Liste aller registrierten Smails:</p>
+            <div id="adminUserList"></div>
+        </div>
     </div>
     <div id="backBox" class="box hide" style="text-align:center;background:#1a2333;border-color:#2b3a54">
         <p>👋 Wieder da? <a href="#" onclick="show('login')">Direkt einloggen</a></p>
     </div>
     <script>
+        const firebaseConfig = { databaseURL: "https://firebasedatabase.app" };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
         const $ = id => document.getElementById(id);
         let current = null;
         let activeTab = 'inbox';
@@ -84,43 +95,67 @@
             setTimeout(() => e.classList.add('hide'), 3000);
         }
         function formatEmail(str) {
-            return str.trim().toLowerCase().replace('.smail.com', '').replace('@smail.com', '') + '@smail.com';
+            return str.trim().toLowerCase().replace('.smail.com', '').replace('@smail.com', '').replace(/[^a-z0-9]/g, '') + '@smail.com';
         }
-        $('regForm').onsubmit = (e) => {
+        function cleanPath(email) { return email.replace('@smail.com', ''); }
+        $('regForm').onsubmit = function(e) {
             e.preventDefault();
             let mail = formatEmail($('regUser').value);
-            let db = JSON.parse(localStorage.getItem('sm_users')) || {};
-            if (db[mail]) return msg('regMsg', 'Existiert bereits!', false);
-            db[mail] = { pass: $('regPass').value };
-            localStorage.setItem('sm_users', JSON.stringify(db));
-            localStorage.setItem('sm_been', '1');
-            msg('regMsg', 'Konto erstellt!', true);
-            setTimeout(() => { $('regForm').reset(); show('login'); }, 1000);
+            let path = cleanPath(mail);
+            database.ref('users/' + path).once('value', function(snapshot) {
+                if (snapshot.exists()) return msg('regMsg', 'Existiert bereits!', false);
+                database.ref('users/' + path).set({ pass: $('regPass').value }, function() {
+                    database.ref('notifications/' + path).set({ email: mail }, function() {
+                        localStorage.setItem('sm_been', '1');
+                        msg('regMsg', 'Konto erstellt!', true);
+                        setTimeout(() => { $('regForm').reset(); show('login'); }, 1000);
+                    });
+                });
+            });
         };
-        $('loginForm').onsubmit = (e) => {
+        $('loginForm').onsubmit = function(e) {
             e.preventDefault();
             let mail = formatEmail($('loginUser').value);
-            let db = JSON.parse(localStorage.getItem('sm_users')) || {};
-            if (db[mail] && db[mail].pass === $('loginPass').value) {
-                localStorage.setItem('sm_sess', mail);
-                localStorage.setItem('sm_been', '1');
-                login(mail);
-            } else { msg('loginMsg', 'Daten falsch!', false); }
+            let path = cleanPath(mail);
+            database.ref('users/' + path).once('value', function(snapshot) {
+                if (snapshot.exists() && snapshot.val().pass === $('loginPass').value) {
+                    localStorage.setItem('sm_sess', mail);
+                    localStorage.setItem('sm_been', '1');
+                    login(mail);
+                } else { msg('loginMsg', 'Daten falsch!', false); }
+            });
         };
-        function login(mail) { current = mail; $('userMail').innerText = mail; show('dash'); switchTab('inbox'); }
+        function login(mail) { 
+            current = mail; 
+            $('userMail').innerText = mail; 
+            show('dash'); 
+            switchTab('inbox'); 
+            if (mail === 'admin@smail.com') {
+                $('adminPanel').classList.remove('hide');
+                listenToAdminNotifications();
+            } else {
+                $('adminPanel').classList.add('hide');
+            }
+        }
         function logout() { localStorage.removeItem('sm_sess'); current = null; $('loginForm').reset(); show('reg'); }
-        $('mailForm').onsubmit = (e) => {
+        $('mailForm').onsubmit = function(e) {
             e.preventDefault();
             let to = formatEmail($('mailTo').value);
-            let db = JSON.parse(localStorage.getItem('sm_users')) || {};
-            if (!db[to]) return msg('mailMsg', 'Empfänger existiert nicht im System!', false);
-            let mails = JSON.parse(localStorage.getItem('sm_mails')) || [];
-            let now = new Date().toLocaleString('de-DE', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
-            mails.push({ id: 'm_' + Date.now(), von: current, an: to, bet: $('mailSub').value, txt: $('mailTxt').value, time: now, status: 'active' });
-            localStorage.setItem('sm_mails', JSON.stringify(mails));
-            msg('mailMsg', 'Erfolgreich gesendet!', true);
-            $('mailForm').reset();
-            loadInbox();
+            let pathTomail = cleanPath(to);
+            let pathFrommail = cleanPath(current);
+            database.ref('users/' + pathTomail).once('value', function(snapshot) {
+                if (!snapshot.exists()) return msg('mailMsg', 'Empfänger existiert nicht im System!', false);
+                let now = new Date().toLocaleString('de-DE', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
+                let mailData = { von: current, an: to, bet: $('mailSub').value, txt: $('mailTxt').value, time: now, status: 'active' };
+                let newMailToRef = database.ref('mails/' + pathTomail).push();
+                newMailToRef.set(mailData, function() {
+                    let newMailFromRef = database.ref('sent/' + pathFrommail).push();
+                    newMailFromRef.set(mailData, function() {
+                        msg('mailMsg', 'Erfolgreich gesendet!', true);
+                        $('mailForm').reset();
+                    });
+                });
+            });
         };
         function switchTab(tab) {
             activeTab = tab;
@@ -130,41 +165,9 @@
             loadInbox();
         }
         function loadInbox() {
-            let mails = JSON.parse(localStorage.getItem('sm_mails')) || [];
-            let container = $('inbox');
-            container.innerHTML = '';
-            let filtered = [];
-            if (activeTab === 'inbox') {
-                filtered = mails.filter(m => m.an === current && m.status === 'active');
-            } else if (activeTab === 'sent') {
-                filtered = mails.filter(m => m.von === current && m.status === 'active');
-            } else if (activeTab === 'trash') {
-                filtered = mails.filter(m => (m.an === current || m.von === current) && m.status === 'deleted');
-            }
-            if (filtered.length === 0) {
-                container.innerHTML = '<p style="font-size:12px;color:#888;text-align:center;margin-top:10px">Keine Nachrichten in dieser Abteilung.</p>';
-                return;
-            }
-            filtered.reverse().forEach(m => {
-                let prefix = activeTab === 'sent' ? 'An' : 'Von';
-                let address = activeTab === 'sent' ? m.an : m.von;
-                let border = activeTab === 'sent' ? 'style="border-left-color:#00af5c"' : '';
-                let deleteIcon = activeTab === 'trash' ? '🗑️' : '❌';
-                container.innerHTML += `<div class="mail-item" ${border}><strong>${prefix}:</strong> <span>${address}</span><br><strong>Betreff:</strong> ${m.bet}<br><span style="color:#e0e0e0">${m.txt}</span><span class="time-badge">⏰ ${m.time}</span><button class="del-btn" onclick="moveMail('${m.id}')">${deleteIcon}</button></div>`;
-            });
-        }
-        window.moveMail = function(mailId) {
-            let mails = JSON.parse(localStorage.getItem('sm_mails')) || [];
-            for (let i = 0; i < mails.length; i++) {
-                if (mails[i].id === mailId) {
-                    if (mails[i].status === 'active') { mails[i].status = 'deleted'; } 
-                    else { mails.splice(i, 1); }
-                    break;
-                }
-            }
-            localStorage.setItem('sm_mails', JSON.stringify(mails));
-            loadInbox();
-        };
-    </script>
-</body>
-</html>
+            let path = cleanPath(current);
+            let dbRef = activeTab === 'sent' ? 'sent/' + path : 'mails/' + path;
+            database.ref(dbRef).on('value', function(snapshot) {
+                const container = $('inbox');
+                container.innerHTML = '';
+        if (!snapshot.exists()) { container.innerHTML = 'Keine Nachrichten in dieser Abteilung.'; return; }let data = snapshot.val();Object.keys(data).reverse().forEach(key => {let m = data[key];if (activeTab === 'trash' && m.status !== 'deleted') return;if (activeTab !== 'trash' && m.status === 'deleted') return;let prefix = activeTab === 'sent' ? 'An' : 'Von';let address = activeTab === 'sent' ? m.an : m.von;let border = activeTab === 'sent' ? 'style="border-left-color:#00af5c"' : '';let deleteIcon = activeTab === 'trash' ? '🗑️' : '❌';container.innerHTML += <div class="mail-item" ${border}><strong>${prefix}:</strong> <span>${address}</span><br><strong>Betreff:</strong> ${m.bet}<br><span style="color:#e0e0e0">${m.txt}</span><span class="time-badge">⏰ ${m.time}</span><button class="del-btn" onclick="moveMail('${key}', '${m.status}')">${deleteIcon}</button></div>;});});}window.moveMail = function(key, status) {let path = cleanPath(current);let dbRef = activeTab === 'sent' ? 'sent/' + path + '/' + key : 'mails/' + path + '/' + key;if (status === 'active') {database.ref(dbRef).update({ status: 'deleted' });} else {database.ref(dbRef).remove();}};function listenToAdminNotifications() {database.ref('notifications').on('value', function(snapshot) {const list = $('adminUserList');list.innerHTML = '';if (!snapshot.exists()) { list.innerHTML = 'Keine neuen Registrierungen.'; return; }let data = snapshot.val();Object.values(data).forEach(user => {list.innerHTML += <div style="padding:4px 0;border-bottom:1px solid #333;color:#75f9b7">👤 Neu registriert: ${user.email}</div>;});});}
