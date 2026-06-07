@@ -13,8 +13,6 @@
         .err{background:#4c1d1d;color:#ff9e9e;border:1px solid #7a1919}
         a{color:#3b82f6;text-decoration:none}
         .mail-item{background:#2d2d2d;padding:8px;margin-top:5px;border-radius:4px;font-size:13px;border-left:3px solid #3b82f6;word-break:break-word}
-        .admin-box{background:#2a1f1f;border:1px solid #ef4444;padding:12px;margin-top:20px;border-radius:6px;font-size:13px}
-        .time-badge{font-size:10px;color:#aaa;display:block;margin-top:3px}
     </style>
 </head>
 <body>
@@ -53,14 +51,9 @@
         </form>
         <h3 style="margin-top:20px;border-top:1px solid #333;padding-top:15px">Posteingang</h3>
         <div id="inbox"></div>
-        <div id="adminPanel" class="admin-box hide">
-            <strong style="color:#ef4444">👑 Admin-Benachrichtigungen</strong>
-            <p style="font-size:11px;color:#aaa;margin-bottom:5px">Liste aller registrierten Smails (Passwörter sind geheim):</p>
-            <div id="adminUserList"></div>
-        </div>
     </div>
     <div id="backBox" class="box hide" style="text-align:center;background:#1a2333;border-color:#2b3a54">
-        <p>👋 Wieder da? <a href="#" onclick="show('login')">Direct einloggen</a></p>
+        <p>👋 Wieder da? <a href="#" onclick="show('login')">Direkt einloggen</a></p>
     </div>
     <script>
         const $ = id => document.getElementById(id);
@@ -74,7 +67,7 @@
             $('loginView').classList.toggle('hide', v !== 'login');
             $('dashView').classList.toggle('hide', v !== 'dash');
             if (v === 'login' || v === 'dash') $('backBox').classList.add('hide');
-            else if (v === 'reg' && localStorage.getItem('sm_been')) $('backBox').classList.remove('hide');
+            else if (v === 'reg' && localStorage.getItem('sm_been')) $('backBox').remove('hide');
         }
         function msg(id, txt, isOk) {
             const e = $(id); e.innerText = txt; e.className = `msg ${isOk?'ok':'err'}`;
@@ -90,8 +83,6 @@
             if (db[mail]) return msg('regMsg', 'Existiert bereits!', false);
             db[mail] = { pass: $('regPass').value };
             localStorage.setItem('sm_users', JSON.stringify(db));
-            let adminList = JSON.parse(localStorage.getItem('sm_admin_list')) || [];
-            if (adminList.indexOf(mail) === -1) { adminList.push(mail); localStorage.setItem('sm_admin_list', JSON.stringify(adminList)); }
             localStorage.setItem('sm_been', '1');
             msg('regMsg', 'Konto erstellt!', true);
             setTimeout(() => { $('regForm').reset(); show('login'); }, 1000);
@@ -106,18 +97,7 @@
                 login(mail);
             } else { msg('loginMsg', 'Daten falsch!', false); }
         };
-        function login(mail) { 
-            current = mail; 
-            $('userMail').innerText = mail; 
-            show('dash'); 
-            loadInbox(); 
-            if (mail === 'admin@smail.com') {
-                $('adminPanel').classList.remove('hide');
-                loadAdminPanel();
-            } else {
-                $('adminPanel').classList.add('hide');
-            }
-        }
+        function login(mail) { current = mail; $('userMail').innerText = mail; show('dash'); loadInbox(); }
         function logout() { localStorage.removeItem('sm_sess'); current = null; $('loginForm').reset(); show('reg'); }
         $('mailForm').onsubmit = (e) => {
             e.preventDefault();
@@ -125,8 +105,7 @@
             let db = JSON.parse(localStorage.getItem('sm_users')) || {};
             if (!db[to]) return msg('mailMsg', 'Empfänger existiert nicht im System!', false);
             let mails = JSON.parse(localStorage.getItem('sm_mails')) || [];
-            let now = new Date().toLocaleString('de-DE', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
-            mails.push({ von: current, an: to, bet: $('mailSub').value, txt: $('mailTxt').value, time: now });
+            mails.push({ von: current, an: to, bet: $('mailSub').value, txt: $('mailTxt').value });
             localStorage.setItem('sm_mails', JSON.stringify(mails));
             msg('mailMsg', 'Erfolgreich gesendet!', true);
             $('mailForm').reset();
@@ -137,14 +116,7 @@
             let myMails = mails.filter(m => m.an === current);
             $('inbox').innerHTML = myMails.length ? '' : '<p style="font-size:12px;color:#888">Keine Nachrichten.</p>';
             myMails.reverse().forEach(m => {
-                $('inbox').innerHTML += `<div class="mail-item"><strong>Von:</strong> <span>${m.von}</span><br><strong>Betreff:</strong> ${m.bet}<br><span style="color:#e0e0e0">${m.txt}</span><span class="time-badge">⏰ ${m.time}</span></div>`;
-            });
-        }
-        function loadAdminPanel() {
-            let adminList = JSON.parse(localStorage.getItem('sm_admin_list')) || [];
-            $('adminUserList').innerHTML = adminList.length ? '' : 'Keine registrierten Nutzer.';
-            adminList.forEach(user => {
-                $('adminUserList').innerHTML += `<div style="padding:4px 0;border-bottom:1px solid #333;color:#75f9b7">👤 Neu registriert: ${user}</div>`;
+                $('inbox').innerHTML += `<div class="mail-item"><strong>Von:</strong> <span>${m.von}</span><br><strong>Betreff:</strong> ${m.bet}<br><span style="color:#e0e0e0">${m.txt}</span></div>`;
             });
         }
     </script>
