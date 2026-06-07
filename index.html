@@ -55,8 +55,8 @@
         <h3 style="margin-top:20px;border-top:1px solid #333;padding-top:15px">Posteingang</h3>
         <div id="inbox"></div>
         <div id="adminPanel" class="admin-box hide">
-            <strong style="color:#ef4444">👑 Admin-Kontrollzentrum</strong>
-            <p style="font-size:11px;color:#aaa;margin-bottom:5px">Registrierte Smail-Adressen (Passwörter sind geheim):</p>
+            <strong style="color:#ef4444">👑 Admin-Benachrichtigungen</strong>
+            <p style="font-size:11px;color:#aaa;margin-bottom:5px">Liste aller registrierten Smails:</p>
             <div id="adminUserList"></div>
         </div>
     </div>
@@ -120,7 +120,8 @@
             $('userMail').innerText = mail; 
             show('dash'); 
             loadInbox(); 
-            if (mail === 'admin@smail.com') {
+            let path = cleanPath(mail);
+            if (path === 'admin') {
                 $('adminPanel').classList.remove('hide');
                 listenToAdminNotifications();
             } else {
