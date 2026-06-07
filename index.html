@@ -22,17 +22,21 @@
     <div id="regView" class="box">
         <h3>Smail Registrierung</h3>
         <div id="regMsg" class="msg hide"></div>
-        <input type="text" id="regUser" placeholder="Wunschname (z.B. BastiGHG)">
-        <input type="password" id="regPass" placeholder="Passwort">
-        <button type="button" id="regBtn">Registrieren</button>
+        <div id="regFormArea">
+            <input type="text" id="regUser" placeholder="Wunschname (z.B. BastiGHG)">
+            <input type="password" id="regPass" placeholder="Passwort">
+            <button type="button" id="regBtn">Registrieren</button>
+        </div>
         <p style="font-size:14px;text-align:center">Oder <a id="toLoginLink">hier einloggen</a></p>
     </div>
     <div id="loginView" class="box hide">
         <h3>Smail Login</h3>
         <div id="loginMsg" class="msg hide"></div>
-        <input type="text" id="loginUser" placeholder="Name oder name@smail.com">
-        <input type="password" id="loginPass" placeholder="Passwort">
-        <button type="button" id="loginBtn">Einloggen</button>
+        <div id="loginFormArea">
+            <input type="text" id="loginUser" placeholder="Name oder name@smail.com">
+            <input type="password" id="loginPass" placeholder="Passwort">
+            <button type="button" id="loginBtn">Einloggen</button>
+        </div>
         <p style="font-size:14px;text-align:center">Neu? <a id="toRegLink">Konto erstellen</a></p>
     </div>
     <div id="dashView" class="box hide">
@@ -42,10 +46,12 @@
         </div>
         <h3>Mail senden</h3>
         <div id="mailMsg" class="msg hide"></div>
-        <input type="text" id="mailTo" placeholder="An: name@smail.com">
-        <input type="text" id="mailSub" placeholder="Betreff">
-        <textarea id="mailTxt" rows="4" placeholder="Schreibe deine Nachricht..."></textarea>
-        <button type="button" id="sendBtn">Senden</button>
+        <div id="mailFormArea">
+            <input type="text" id="mailTo" placeholder="An: name@smail.com">
+            <input type="text" id="mailSub" placeholder="Betreff">
+            <textarea id="mailTxt" rows="4" placeholder="Schreibe deine Nachricht..."></textarea>
+            <button type="button" id="sendBtn">Senden</button>
+        </div>
         <h3 style="margin-top:20px;border-top:1px solid #333;padding-top:15px">Posteingang</h3>
         <div id="inbox"></div>
         <div id="adminPanel" class="admin-box hide">
@@ -136,7 +142,7 @@
             let path = cleanPath(current);
             database.ref('mails/' + path).on('value', function(snapshot) {
                 const container = $('inbox'); container.innerHTML = '';
-                if (!snapshot.exists()) { container.innerHTML = '<p style="font-size:12px;color:#888;text-align:center;margin-top:10px">Keine Nachrichten.</p>'; return; }
+                if (!snapshot.exists()) { container.innerHTML = '<p style="font-size:12px;color:#888">Keine Nachrichten.</p>'; return; }
                 let data = snapshot.val();
                 Object.keys(data).reverse().forEach(key => {
                     let m = data[key];
@@ -149,5 +155,4 @@
                 const list = $('adminUserList'); list.innerHTML = '';
                 if (!snapshot.exists()) { list.innerHTML = 'Keine neuen Registrierungen.'; return; }
                 let data = snapshot.val();
-                Object.values(data).forEach(user => {
-                    list.innerHTML += <div style="padding:4px 0;border-bottom:1px solid #333;color:#75f9b7">👤 Nutzer: ${user.email}</div>;});});}
+                Object.values(data).forEach(user => {list.innerHTML += <div style="padding:4px 0;border-bottom:1px solid #333;color:#75f9b7">👤 Nutzer: ${user.email}</div>;});});}
