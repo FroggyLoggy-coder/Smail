@@ -22,36 +22,30 @@
     <div id="regView" class="box">
         <h3>Smail Registrierung</h3>
         <div id="regMsg" class="msg hide"></div>
-        <div id="regFormArea">
-            <input type="text" id="regUser" placeholder="Wunschname (z.B. BastiGHG)">
-            <input type="password" id="regPass" placeholder="Passwort">
-            <button type="button" id="regBtn">Registrieren</button>
-        </div>
-        <p style="font-size:14px;text-align:center">Oder <a id="toLoginLink">hier einloggen</a></p>
+        <input type="text" id="regUser" placeholder="Wunschname (z.B. BastiGHG)">
+        <input type="password" id="regPass" placeholder="Passwort">
+        <button type="button" onclick="executeRegister()">Registrieren</button>
+        <p style="font-size:14px;text-align:center">Oder <a onclick="switchView('login')">hier einloggen</a></p>
     </div>
     <div id="loginView" class="box hide">
         <h3>Smail Login</h3>
         <div id="loginMsg" class="msg hide"></div>
-        <div id="loginFormArea">
-            <input type="text" id="loginUser" placeholder="Name oder name@smail.com">
-            <input type="password" id="loginPass" placeholder="Passwort">
-            <button type="button" id="loginBtn">Einloggen</button>
-        </div>
-        <p style="font-size:14px;text-align:center">Neu? <a id="toRegLink">Konto erstellen</a></p>
+        <input type="text" id="loginUser" placeholder="Name oder name@smail.com">
+        <input type="password" id="loginPass" placeholder="Passwort">
+        <button type="button" onclick="executeLogin()">Einloggen</button>
+        <p style="font-size:14px;text-align:center">Neu? <a onclick="switchView('reg')">Konto erstellen</a></p>
     </div>
     <div id="dashView" class="box hide">
         <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:10px">
             <span id="userMail" style="font-weight:bold;color:#3b82f6"></span>
-            <a id="logoutLink" style="color:#ef4444">Abmelden</a>
+            <a onclick="executeLogout()" style="color:#ef4444">Abmelden</a>
         </div>
         <h3>Mail senden</h3>
         <div id="mailMsg" class="msg hide"></div>
-        <div id="mailFormArea">
-            <input type="text" id="mailTo" placeholder="An: name@smail.com">
-            <input type="text" id="mailSub" placeholder="Betreff">
-            <textarea id="mailTxt" rows="4" placeholder="Schreibe deine Nachricht..."></textarea>
-            <button type="button" id="sendBtn">Senden</button>
-        </div>
+        <input type="text" id="mailTo" placeholder="An: name@smail.com">
+        <input type="text" id="mailSub" placeholder="Betreff">
+        <textarea id="mailTxt" rows="4" placeholder="Schreibe deine Nachricht..."></textarea>
+        <button type="button" onclick="executeSend()">Senden</button>
         <h3 style="margin-top:20px;border-top:1px solid #333;padding-top:15px">Posteingang</h3>
         <div id="inbox"></div>
         <div id="adminPanel" class="admin-box hide">
@@ -61,7 +55,7 @@
         </div>
     </div>
     <div id="backBox" class="box hide" style="text-align:center;background:#1a2333;border-color:#2b3a54">
-        <p>👋 Wieder da? <a id="backBoxLoginLink">Direkt einloggen</a></p>
+        <p>👋 Wieder da? <a onclick="switchView('login')">Direkt einloggen</a></p>
     </div>
     <script>
         const firebaseConfig = { databaseURL: "https://firebasedatabase.app" };
@@ -72,50 +66,6 @@
         window.onload = () => {
             if (localStorage.getItem('sm_sess')) { login(localStorage.getItem('sm_sess')); } 
             else { switchView('reg'); if (localStorage.getItem('sm_been')) $('backBox').classList.remove('hide'); }
-            document.getElementById('toLoginLink').onclick = function(e){ e.preventDefault(); switchView('login'); };
-            document.getElementById('toRegLink').onclick = function(e){ e.preventDefault(); switchView('reg'); };
-            document.getElementById('backBoxLoginLink').onclick = function(e){ e.preventDefault(); switchView('login'); };
-            document.getElementById('logoutLink').onclick = function(e){
-                e.preventDefault(); localStorage.removeItem('sm_sess'); current = null;
-                $('loginUser').value = ''; $('loginPass').value = ''; switchView('reg');
-            };
-            document.getElementById('regBtn').onclick = function() {
-                let uVal = $('regUser').value; let pVal = $('regPass').value;
-                if(!uVal || !pVal) return;
-                let mail = formatEmail(uVal); let path = cleanPath(mail);
-                database.ref('users/' + path).once('value', function(snapshot) {
-                    if (snapshot.exists()) return msg('regMsg', 'Existiert bereits!', false);
-                    database.ref('users/' + path).set({ pass: pVal }, function() {
-                        database.ref('notifications/' + path).set({ email: mail }, function() {
-                            localStorage.setItem('sm_been', '1'); msg('regMsg', 'Konto erstellt!', true);
-                            $('regUser').value = ''; $('regPass').value = ''; setTimeout(() => { switchView('login'); }, 1000);
-                        });
-                    });
-                });
-            };
-            document.getElementById('loginBtn').onclick = function() {
-                let uVal = $('loginUser').value; let pVal = $('loginPass').value;
-                if(!uVal || !pVal) return;
-                let mail = formatEmail(uVal); let path = cleanPath(mail);
-                database.ref('users/' + path).once('value', function(snapshot) {
-                    if (snapshot.exists() && snapshot.val().pass === pVal) {
-                        localStorage.setItem('sm_sess', mail); localStorage.setItem('sm_been', '1'); login(mail);
-                    } else { msg('loginMsg', 'Daten falsch!', false); }
-                });
-            };
-            document.getElementById('sendBtn').onclick = function() {
-                let toVal = $('mailTo').value; let subVal = $('mailSub').value; let txtVal = $('mailTxt').value;
-                if(!toVal || !subVal || !txtVal) return;
-                let to = formatEmail(toVal); let pathTomail = cleanPath(to);
-                database.ref('users/' + pathTomail).once('value', function(snapshot) {
-                    if (!snapshot.exists()) return msg('mailMsg', 'Empfänger existiert nicht im System!', false);
-                    let mailData = { von: current, an: to, bet: subVal, txt: txtVal };
-                    database.ref('mails/' + pathTomail).push().set(mailData, function() {
-                        msg('mailMsg', 'Erfolgreich gesendet!', true);
-                        $('mailTo').value = ''; $('mailSub').value = ''; $('mailTxt').value = '';
-                    });
-                });
-            };
         };
         function switchView(v) {
             $('regView').classList.toggle('hide', v !== 'reg');
@@ -132,6 +82,44 @@
             return str.trim().toLowerCase().replace('.smail.com', '').replace('@smail.com', '').replace(/[^a-z0-9]/g, '') + '@smail.com';
         }
         function cleanPath(email) { return email.replace('@smail.com', ''); }
+        function executeRegister() {
+            let uVal = $('regUser').value; let pVal = $('regPass').value;
+            if(!uVal || !pVal) return;
+            let mail = formatEmail(uVal); let path = cleanPath(mail);
+            database.ref('users/' + path).once('value', function(snapshot) {
+                if (snapshot.exists()) return msg('regMsg', 'Existiert bereits!', false);
+                database.ref('users/' + path).set({ pass: pVal }, function() {
+                    database.ref('notifications/' + path).set({ email: mail }, function() {
+                        localStorage.setItem('sm_been', '1'); msg('regMsg', 'Konto erstellt!', true);
+                        $('regUser').value = ''; $('regPass').value = ''; setTimeout(() => { switchView('login'); }, 1000);
+                    });
+                });
+            });
+        }
+        function executeLogin() {
+            let uVal = $('loginUser').value; let pVal = $('loginPass').value;
+            if(!uVal || !pVal) return;
+            let mail = formatEmail(uVal); let path = cleanPath(mail);
+            database.ref('users/' + path).once('value', function(snapshot) {
+                if (snapshot.exists() && snapshot.val().pass === pVal) {
+                    localStorage.setItem('sm_sess', mail); localStorage.setItem('sm_been', '1'); login(mail);
+                } else { msg('loginMsg', 'Daten falsch!', false); }
+            });
+        }
+        function executeLogout() { localStorage.removeItem('sm_sess'); current = null; $('loginUser').value = ''; $('loginPass').value = ''; switchView('reg'); }
+        function executeSend() {
+            let toVal = $('mailTo').value; let subVal = $('mailSub').value; let txtVal = $('mailTxt').value;
+            if(!toVal || !subVal || !txtVal) return;
+            let to = formatEmail(toVal); let pathTomail = cleanPath(to);
+            database.ref('users/' + pathTomail).once('value', function(snapshot) {
+                if (!snapshot.exists()) return msg('mailMsg', 'Empfänger existiert nicht im System!', false);
+                let mailData = { von: current, an: to, bet: subVal, txt: txtVal };
+                database.ref('mails/' + pathTomail).push().set(mailData, function() {
+                    msg('mailMsg', 'Erfolgreich gesendet!', true);
+                    $('mailTo').value = ''; $('mailSub').value = ''; $('mailTxt').value = '';
+                });
+            });
+        }
         function login(mail) { 
             current = mail; $('userMail').innerText = mail; switchView('dash'); loadInbox(); 
             let path = cleanPath(mail);
@@ -155,4 +143,11 @@
                 const list = $('adminUserList'); list.innerHTML = '';
                 if (!snapshot.exists()) { list.innerHTML = 'Keine neuen Registrierungen.'; return; }
                 let data = snapshot.val();
-                Object.values(data).forEach(user => {list.innerHTML += <div style="padding:4px 0;border-bottom:1px solid #333;color:#75f9b7">👤 Nutzer: ${user.email}</div>;});});}
+                Object.values(data).forEach(user => {
+                    list.innerHTML += `<div style="padding:4px 0;border-bottom:1px solid #333;color:#75f9b7">👤 Nutzer: ${user.email}</div>`;
+                });
+            });
+        }
+    </script>
+</body>
+</html>
