@@ -22,36 +22,30 @@
     <div id="regView" class="box">
         <h3>Smail Registrierung</h3>
         <div id="regMsg" class="msg hide"></div>
-        <form id="regForm">
-            <input type="text" id="regUser" placeholder="Wunschname (z.B. BastiGHG)" required>
-            <input type="password" id="regPass" placeholder="Passwort" required>
-            <button type="submit">Registrieren</button>
-        </form>
-        <p style="font-size:14px;text-align:center">Oder <a href="#" onclick="show('login')">hier einloggen</a></p>
+        <input type="text" id="regUser" placeholder="Wunschname (z.B. BastiGHG)">
+        <input type="password" id="regPass" placeholder="Passwort">
+        <button type="button" id="regBtn">Registrieren</button>
+        <p style="font-size:14px;text-align:center">Oder <a id="toLoginLink">hier einloggen</a></p>
     </div>
     <div id="loginView" class="box hide">
         <h3>Smail Login</h3>
         <div id="loginMsg" class="msg hide"></div>
-        <form id="loginForm">
-            <input type="text" id="loginUser" placeholder="Name oder name@smail.com" required>
-            <input type="password" id="loginPass" placeholder="Passwort" required>
-            <button type="submit">Einloggen</button>
-        </form>
-        <p style="font-size:14px;text-align:center">Neu? <a href="#" onclick="show('reg')">Konto erstellen</a></p>
+        <input type="text" id="loginUser" placeholder="Name oder name@smail.com">
+        <input type="password" id="loginPass" placeholder="Passwort">
+        <button type="button" id="loginBtn">Einloggen</button>
+        <p style="font-size:14px;text-align:center">Neu? <a id="toRegLink">Konto erstellen</a></p>
     </div>
     <div id="dashView" class="box hide">
         <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:10px">
             <span id="userMail" style="font-weight:bold;color:#3b82f6"></span>
-            <a href="#" onclick="logout()" style="color:#ef4444">Abmelden</a>
+            <a id="logoutLink" style="color:#ef4444">Abmelden</a>
         </div>
         <h3>Mail senden</h3>
         <div id="mailMsg" class="msg hide"></div>
-        <form id="mailForm">
-            <input type="text" id="mailTo" placeholder="An: name@smail.com" required>
-            <input type="text" id="mailSub" placeholder="Betreff" required>
-            <textarea id="mailTxt" rows="4" placeholder="Schreibe deine Nachricht..." required></textarea>
-            <button type="submit">Senden</button>
-        </form>
+        <input type="text" id="mailTo" placeholder="An: name@smail.com">
+        <input type="text" id="mailSub" placeholder="Betreff">
+        <textarea id="mailTxt" rows="4" placeholder="Schreibe deine Nachricht..."></textarea>
+        <button type="button" id="sendBtn">Senden</button>
         <h3 style="margin-top:20px;border-top:1px solid #333;padding-top:15px">Posteingang</h3>
         <div id="inbox"></div>
         <div id="adminPanel" class="admin-box hide">
@@ -61,7 +55,7 @@
         </div>
     </div>
     <div id="backBox" class="box hide" style="text-align:center;background:#1a2333;border-color:#2b3a54">
-        <p>👋 Wieder da? <a href="#" onclick="show('login')">Direkt einloggen</a></p>
+        <p>👋 Wieder da? <a id="backBoxLoginLink">Direkt einloggen</a></p>
     </div>
     <script>
         const firebaseConfig = { databaseURL: "https://firebasedatabase.app" };
@@ -71,9 +65,53 @@
         let current = null;
         window.onload = () => {
             if (localStorage.getItem('sm_sess')) { login(localStorage.getItem('sm_sess')); } 
-            else { show('reg'); if (localStorage.getItem('sm_been')) $('backBox').classList.remove('hide'); }
+            else { switchView('reg'); if (localStorage.getItem('sm_been')) $('backBox').classList.remove('hide'); }
+            document.getElementById('toLoginLink').onclick = function(e){ e.preventDefault(); switchView('login'); };
+            document.getElementById('toRegLink').onclick = function(e){ e.preventDefault(); switchView('reg'); };
+            document.getElementById('backBoxLoginLink').onclick = function(e){ e.preventDefault(); switchView('login'); };
+            document.getElementById('logoutLink').onclick = function(e){
+                e.preventDefault(); localStorage.removeItem('sm_sess'); current = null;
+                $('loginUser').value = ''; $('loginPass').value = ''; switchView('reg');
+            };
+            document.getElementById('regBtn').onclick = function() {
+                let uVal = $('regUser').value; let pVal = $('regPass').value;
+                if(!uVal || !pVal) return;
+                let mail = formatEmail(uVal); let path = cleanPath(mail);
+                database.ref('users/' + path).once('value', function(snapshot) {
+                    if (snapshot.exists()) return msg('regMsg', 'Existiert bereits!', false);
+                    database.ref('users/' + path).set({ pass: pVal }, function() {
+                        database.ref('notifications/' + path).set({ email: mail }, function() {
+                            localStorage.setItem('sm_been', '1'); msg('regMsg', 'Konto erstellt!', true);
+                            $('regUser').value = ''; $('regPass').value = ''; setTimeout(() => { switchView('login'); }, 1000);
+                        });
+                    });
+                });
+            };
+            document.getElementById('loginBtn').onclick = function() {
+                let uVal = $('loginUser').value; let pVal = $('loginPass').value;
+                if(!uVal || !pVal) return;
+                let mail = formatEmail(uVal); let path = cleanPath(mail);
+                database.ref('users/' + path).once('value', function(snapshot) {
+                    if (snapshot.exists() && snapshot.val().pass === pVal) {
+                        localStorage.setItem('sm_sess', mail); localStorage.setItem('sm_been', '1'); login(mail);
+                    } else { msg('loginMsg', 'Daten falsch!', false); }
+                });
+            };
+            document.getElementById('sendBtn').onclick = function() {
+                let toVal = $('mailTo').value; let subVal = $('mailSub').value; let txtVal = $('mailTxt').value;
+                if(!toVal || !subVal || !txtVal) return;
+                let to = formatEmail(toVal); let pathTomail = cleanPath(to);
+                database.ref('users/' + pathTomail).once('value', function(snapshot) {
+                    if (!snapshot.exists()) return msg('mailMsg', 'Empfänger existiert nicht im System!', false);
+                    let mailData = { von: current, an: to, bet: subVal, txt: txtVal };
+                    database.ref('mails/' + pathTomail).push().set(mailData, function() {
+                        msg('mailMsg', 'Erfolgreich gesendet!', true);
+                        $('mailTo').value = ''; $('mailSub').value = ''; $('mailTxt').value = '';
+                    });
+                });
+            };
         };
-        function show(v) {
+        function switchView(v) {
             $('regView').classList.toggle('hide', v !== 'reg');
             $('loginView').classList.toggle('hide', v !== 'login');
             $('dashView').classList.toggle('hide', v !== 'dash');
@@ -82,72 +120,22 @@
         }
         function msg(id, txt, isOk) {
             const e = $(id); e.innerText = txt; e.className = `msg ${isOk?'ok':'err'}`;
-            setTimeout(() => e.classList.add('hide'), 3000);
+            e.classList.remove('hide'); setTimeout(() => e.classList.add('hide'), 3000);
         }
         function formatEmail(str) {
             return str.trim().toLowerCase().replace('.smail.com', '').replace('@smail.com', '').replace(/[^a-z0-9]/g, '') + '@smail.com';
         }
         function cleanPath(email) { return email.replace('@smail.com', ''); }
-        $('regForm').onsubmit = function(e) {
-            e.preventDefault();
-            let mail = formatEmail($('regUser').value);
-            let path = cleanPath(mail);
-            database.ref('users/' + path).once('value', function(snapshot) {
-                if (snapshot.exists()) return msg('regMsg', 'Existiert bereits!', false);
-                database.ref('users/' + path).set({ pass: $('regPass').value }, function() {
-                    database.ref('notifications/' + path).set({ email: mail }, function() {
-                        localStorage.setItem('sm_been', '1');
-                        msg('regMsg', 'Konto erstellt!', true);
-                        setTimeout(() => { $('regForm').reset(); show('login'); }, 1000);
-                    });
-                });
-            });
-        };
-        $('loginForm').onsubmit = function(e) {
-            e.preventDefault();
-            let mail = formatEmail($('loginUser').value);
-            let path = cleanPath(mail);
-            database.ref('users/' + path).once('value', function(snapshot) {
-                if (snapshot.exists() && snapshot.val().pass === $('loginPass').value) {
-                    localStorage.setItem('sm_sess', mail);
-                    localStorage.setItem('sm_been', '1');
-                    login(mail);
-                } else { msg('loginMsg', 'Daten falsch!', false); }
-            });
-        };
         function login(mail) { 
-            current = mail; 
-            $('userMail').innerText = mail; 
-            show('dash'); 
-            loadInbox(); 
+            current = mail; $('userMail').innerText = mail; switchView('dash'); loadInbox(); 
             let path = cleanPath(mail);
-            if (path === 'admin') {
-                $('adminPanel').classList.remove('hide');
-                listenToAdminNotifications();
-            } else {
-                $('adminPanel').classList.add('hide');
-            }
+            if (path === 'admin') { $('adminPanel').classList.remove('hide'); listenToAdminNotifications(); } 
+            else { $('adminPanel').classList.add('hide'); }
         }
-        function logout() { localStorage.removeItem('sm_sess'); current = null; $('loginForm').reset(); show('reg'); }
-        $('mailForm').onsubmit = function(e) {
-            e.preventDefault();
-            let to = formatEmail($('mailTo').value);
-            let pathTomail = cleanPath(to);
-            database.ref('users/' + pathTomail).once('value', function(snapshot) {
-                if (!snapshot.exists()) return msg('mailMsg', 'Empfänger existiert nicht im System!', false);
-                let mailData = { von: current, an: to, bet: $('mailSub').value, txt: $('mailTxt').value };
-                let newMailToRef = database.ref('mails/' + pathTomail).push();
-                newMailToRef.set(mailData, function() {
-                    msg('mailMsg', 'Erfolgreich gesendet!', true);
-                    $('mailForm').reset();
-                });
-            });
-        };
         function loadInbox() {
             let path = cleanPath(current);
             database.ref('mails/' + path).on('value', function(snapshot) {
-                const container = $('inbox');
-                container.innerHTML = '';
+                const container = $('inbox'); container.innerHTML = '';
                 if (!snapshot.exists()) { container.innerHTML = '<p style="font-size:12px;color:#888;text-align:center;margin-top:10px">Keine Nachrichten.</p>'; return; }
                 let data = snapshot.val();
                 Object.keys(data).reverse().forEach(key => {
@@ -158,15 +146,8 @@
         }
         function listenToAdminNotifications() {
             database.ref('notifications').on('value', function(snapshot) {
-                const list = $('adminUserList');
-                list.innerHTML = '';
+                const list = $('adminUserList'); list.innerHTML = '';
                 if (!snapshot.exists()) { list.innerHTML = 'Keine neuen Registrierungen.'; return; }
                 let data = snapshot.val();
                 Object.values(data).forEach(user => {
-                    list.innerHTML += `<div style="padding:4px 0;border-bottom:1px solid #333;color:#75f9b7">👤 Nutzer: ${user.email}</div>`;
-                });
-            });
-        }
-    </script>
-</body>
-</html>
+                    list.innerHTML += <div style="padding:4px 0;border-bottom:1px solid #333;color:#75f9b7">👤 Nutzer: ${user.email}</div>;});});}
