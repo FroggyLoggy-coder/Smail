@@ -2,6 +2,7 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8"><title>Smail Premium</title>
+    <link rel="manifest" href="manifest.json">
     <style>
         body{font-family:sans-serif;background:#121212;color:#e0e0e0;padding:20px;display:flex;flex-direction:column;align-items:center}
         .box{background:#1e1e1e;padding:20px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.3);width:100%;max-width:400px;margin-bottom:15px;border:1px solid #333}
@@ -67,7 +68,7 @@
             $('loginView').classList.toggle('hide', v !== 'login');
             $('dashView').classList.toggle('hide', v !== 'dash');
             if (v === 'login' || v === 'dash') $('backBox').classList.add('hide');
-            else if (v === 'reg' && localStorage.getItem('sm_been')) $('backBox').remove('hide');
+            else if (v === 'reg' && localStorage.getItem('sm_been')) $('backBox').classList.remove('hide');
         }
         function msg(id, txt, isOk) {
             const e = $(id); e.innerText = txt; e.className = `msg ${isOk?'ok':'err'}`;
